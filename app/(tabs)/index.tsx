@@ -1,12 +1,22 @@
-import MOCK_POSTS from '@/mock/posts';
+import { View, ActivityIndicator } from 'react-native';
+import { useEffect } from 'react';
+import NavigationTop from '@components/navigation/NavigationTop';
 import ContentContainer from '@components/container';
 import { FeedList } from '@components/feed/FeedList';
-import NavigationTop from '@components/navigation/NavigationTop';
-import { ThemedView } from '@components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
-import { View } from 'react-native';
+import { ThemedView } from '@components/themed-view';
+import { useFeedStore } from '@/store/feed-store';
 
 export default function HomeScreen() {
+    const posts = useFeedStore(state => state.posts);
+    const loading = useFeedStore(state => state.loading);
+    const loadMore = useFeedStore(state => state.loadMore);
+    const fetchFeed = useFeedStore(state => state.fetchFeed);
+
+    useEffect(() => {
+        fetchFeed();
+    }, [fetchFeed]);
+
     return (
         <ThemedView style={{ flex: 1 }}>
             <ContentContainer isTopElement={true}>
@@ -32,7 +42,11 @@ export default function HomeScreen() {
                 />
             </ContentContainer>
 
-            <FeedList posts={MOCK_POSTS} />
+            {loading && posts.length === 0 ? (
+                <ActivityIndicator style={{ flex: 1 }} />
+            ) : (
+                <FeedList posts={posts} onEndReached={loadMore} />
+            )}
         </ThemedView>
     );
 }

@@ -1,32 +1,29 @@
-import { TouchableOpacity, StyleSheet } from 'react-native';
+import { FeedColors, Spacing } from '@/constants/theme';
+import { useFeedStore } from '@/store/feed-store';
+import { ThemedText } from '@components/themed-text';
+import { ThemedView } from '@components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { ThemedText } from '@components/themed-text';
-import { FeedColors, Spacing } from '@/constants/theme';
-import { ThemedView } from '@components/themed-view';
-import { Comment } from '@type/Post';
-
-const countAllComments = (comments: Comment[]): number => {
-    return comments.reduce((total, comment) => {
-        return total + 1 + comment.replies.length;
-    }, 0);
-};
+import { StyleSheet, TouchableOpacity } from 'react-native';
 
 function FeedPostActions({
+    postId,
     initialLikes,
-    comments,
+    initialLiked = false,
+    commentCount = 0,
 }: {
+    postId: string;
     initialLikes: number;
-    comments: Comment[];
+    initialLiked?: boolean;
+    commentCount?: number;
 }) {
-    const [liked, setLiked] = useState(false);
     const [saved, setSaved] = useState(false);
-    const [likeCount, setLikeCount] = useState(initialLikes);
+    const { posts, toggleLike } = useFeedStore();
 
-    const handleLike = () => {
-        setLiked(prev => !prev);
-        setLikeCount(prev => (liked ? prev - 1 : prev + 1));
-    };
+    // 스토어의 최신 상태를 우선 사용, 없으면 props 초기값 fallback
+    const post = posts.find(p => p.id === postId);
+    const liked = post?.liked ?? initialLiked;
+    const likeCount = post?.likes ?? initialLikes;
 
     const handleSave = () => setSaved(prev => !prev);
 
@@ -34,7 +31,7 @@ function FeedPostActions({
         <ThemedView style={styles.actions}>
             <ThemedView style={styles.leftActions}>
                 <TouchableOpacity
-                    onPress={handleLike}
+                    onPress={() => toggleLike(postId)}
                     style={[styles.actionButton, styles.row]}
                 >
                     <Ionicons
@@ -58,7 +55,7 @@ function FeedPostActions({
                         color={FeedColors.primaryText}
                     />
                     <ThemedText style={styles.countText}>
-                        {countAllComments(comments).toLocaleString()}
+                        {commentCount.toLocaleString()}
                     </ThemedText>
                 </TouchableOpacity>
 

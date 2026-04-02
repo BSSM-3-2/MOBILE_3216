@@ -1,25 +1,48 @@
-import { useLocalSearchParams } from 'expo-router';
-import MOCK_USER from '@/mock/user';
-import { MOCK_USERS_MAP } from '@/mock/users';
+import { useEffect } from 'react';
+import { ActivityIndicator } from 'react-native';
 import { ThemedView } from '@components/themed-view';
-
 import ProfileFeedList from '@components/profile/feed/ProfileFeedList';
-import MOCK_POSTS from '@/mock/posts';
 import ContentContainer from '@components/container';
 import NavigationTop from '@components/navigation/NavigationTop';
+import { ProfileHeader } from '@components/profile/ProfileHeader';
+import { useUserStore } from '@/store/user-store';
 
 export default function ProfileScreen() {
-    const { userId } = useLocalSearchParams<{ userId?: string }>();
+    const {
+        me,
+        postMap,
+        loading: _loading,
+        fetchMe,
+        fetchUserPosts,
+    } = useUserStore();
 
-    const currentUser = (userId && MOCK_USERS_MAP[userId]) ? MOCK_USERS_MAP[userId] : MOCK_USER;
-    const userPosts = userId ? MOCK_POSTS.filter(post => post.userId === userId) : MOCK_POSTS;
+    useEffect(() => {
+        fetchMe();
+    }, [fetchMe]);
+
+    useEffect(() => {
+        if (me) fetchUserPosts(me.id);
+    }, [me, fetchUserPosts]);
+
+    if (!me) {
+        return (
+            <ThemedView style={{ flex: 1 }}>
+                <ActivityIndicator style={{ flex: 1 }} />
+            </ThemedView>
+        );
+    }
+
+    const posts = postMap[me.id] ?? [];
 
     return (
         <ThemedView style={{ flex: 1 }}>
             <ContentContainer isTopElement={true}>
-                <NavigationTop title={currentUser.username} />
+                <NavigationTop title={me.username} />
             </ContentContainer>
-            <ProfileFeedList posts={userPosts} user={currentUser} />
+            <ProfileFeedList
+                posts={posts}
+                header={<ProfileHeader user={me} />}
+            />
         </ThemedView>
     );
 }

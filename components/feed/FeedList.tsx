@@ -1,27 +1,24 @@
-import { ThemedView } from '@components/themed-view';
+import { FlatList } from 'react-native';
 import { Post } from '@type/Post';
-import { FlatList, StyleSheet } from 'react-native';
 import { FeedPost } from './post/FeedPost';
 
-function FeedList({ posts }: { posts: Post[] }) {
-    const renderPost = ({ item }: { item: Post }) => (
-        <FeedPost post={item} />
-    );
-
+function FeedList({
+    posts,
+    onEndReached,
+}: {
+    posts: Post[];
+    onEndReached?: () => void;
+}) {
     return (
-        <ThemedView style={styles.container}>
-            <FlatList
-                data={posts}
-                renderItem={renderPost}
-                keyExtractor={(item) => item.id.toString()}
-                style={{ flex: 1 }}
-            />
-        </ThemedView>
+        <FlatList
+            data={posts}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => <FeedPost post={item} />}
+            showsVerticalScrollIndicator={false}
+            onEndReached={onEndReached}
+            onEndReachedThreshold={0.5}
+        />
     );
 }
-
-const styles = StyleSheet.create({
-    container: { flex: 1 },
-});
 
 export { FeedList };

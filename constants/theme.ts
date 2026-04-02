@@ -6,10 +6,10 @@
 import { Platform } from 'react-native';
 
 export const Pretendard = {
-    regular:   'Pretendard-Regular',
-    medium:    'Pretendard-Medium',
-    semiBold:  'Pretendard-SemiBold',
-    bold:      'Pretendard-Bold',
+    regular: 'Pretendard-Regular',
+    medium: 'Pretendard-Medium',
+    semiBold: 'Pretendard-SemiBold',
+    bold: 'Pretendard-Bold',
     extraBold: 'Pretendard-ExtraBold',
 } as const;
 
@@ -27,8 +27,11 @@ export const Spacing = {
 };
 
 export const Grid = {
+    /** 프로필 피드 그리드 열 수 */
     profileColumnCount: 3,
+    /** 프로필 피드 이미지 세로 비율 (height = width * ratio) */
     profileImageRatio: 1.25,
+    /** 그리드 아이템 간 간격 */
     gap: Spacing.xxs,
 };
 
