@@ -14,6 +14,7 @@ interface FeedState {
     fetchFeed: () => Promise<void>;
     loadMore: () => Promise<void>;
     toggleLike: (postId: string) => Promise<void>;
+    removePost: (postId: string) => void;
 }
 
 export const useFeedStore = create<FeedState>((set: any, get: any) => ({
@@ -103,5 +104,11 @@ export const useFeedStore = create<FeedState>((set: any, get: any) => ({
             // rollback using latest store state source get().posts to avoid stale closure
             set({ posts: prevPosts });
         }
+    },
+
+    removePost: (postId: string) => {
+        set((state: FeedState) => ({
+            posts: state.posts.filter(p => p.id !== postId),
+        }));
     },
 }));

@@ -3,8 +3,8 @@ import { useFeedStore } from '@/store/feed-store';
 import { ThemedText } from '@components/themed-text';
 import { ThemedView } from '@components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { useRef, useState } from 'react';
+import { Animated, StyleSheet, TouchableOpacity } from 'react-native';
 
 function FeedPostActions({
     postId,
@@ -19,30 +19,51 @@ function FeedPostActions({
 }) {
     const [saved, setSaved] = useState(false);
     const { posts, toggleLike } = useFeedStore();
+    const likeScale = useRef(new Animated.Value(1)).current;
 
-    // 스토어의 최신 상태를 우선 사용, 없으면 props 초기값 fallback
     const post = posts.find(p => p.id === postId);
     const liked = post?.liked ?? initialLiked;
     const likeCount = post?.likes ?? initialLikes;
 
     const handleSave = () => setSaved(prev => !prev);
+    const handleLike = () => {
+        toggleLike(postId);
+        likeScale.setValue(1);
+        Animated.sequence([
+            Animated.timing(likeScale, {
+                toValue: 1.25,
+                duration: 120,
+                useNativeDriver: true,
+            }),
+            Animated.spring(likeScale, {
+                toValue: 1,
+                friction: 5,
+                tension: 150,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    };
 
     return (
         <ThemedView style={styles.actions}>
             <ThemedView style={styles.leftActions}>
                 <TouchableOpacity
-                    onPress={() => toggleLike(postId)}
+                    onPress={handleLike}
                     style={[styles.actionButton, styles.row]}
                 >
-                    <Ionicons
-                        name={liked ? 'heart' : 'heart-outline'}
-                        size={26}
-                        color={
-                            liked
-                                ? FeedColors.likeActive
-                                : FeedColors.primaryText
-                        }
-                    />
+                    <Animated.View
+                        style={{ transform: [{ scale: likeScale }] }}
+                    >
+                        <Ionicons
+                            name={liked ? 'heart' : 'heart-outline'}
+                            size={26}
+                            color={
+                                liked
+                                    ? FeedColors.likeActive
+                                    : FeedColors.primaryText
+                            }
+                        />
+                    </Animated.View>
                     <ThemedText style={styles.countText}>
                         {likeCount.toLocaleString()}
                     </ThemedText>

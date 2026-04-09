@@ -1,4 +1,3 @@
-import { StyleSheet } from 'react-native';
 import { Post } from '@type/Post';
 import ContentContainer from '@components/container';
 import { FeedPostHeader } from './FeedPostHeader';
@@ -7,16 +6,27 @@ import { FeedPostCaption } from './FeedPostCaption';
 import { ThemedView } from '@components/themed-view';
 import FeedImage from '@components/feed/post/FeedImage';
 import { resolveImageSource } from '@/utils/image';
+import { useFeedStore } from '@/store/feed-store';
 
 function FeedPost({ post }: { post: Post }) {
     const user = post.author;
+    const toggleLike = useFeedStore(state => state.toggleLike);
 
     if (!user) return null;
 
+    const handleDoubleTapLike = () => {
+        if (!post.liked) {
+            toggleLike(post.id);
+        }
+    };
+
     return (
-        <ThemedView style={styles.feedMargin}>
+        <ThemedView>
             <FeedPostHeader user={user} />
-            <FeedImage image={resolveImageSource(post.images[0])} />
+            <FeedImage
+                image={resolveImageSource(post.images[0])}
+                onDoubleTap={handleDoubleTapLike}
+            />
             <ContentContainer style={{ gap: 4 }}>
                 <FeedPostActions
                     postId={post.id}
@@ -33,11 +43,5 @@ function FeedPost({ post }: { post: Post }) {
         </ThemedView>
     );
 }
-
-const styles = StyleSheet.create({
-    feedMargin: {
-        marginBottom: 20,
-    },
-});
 
 export { FeedPost };
