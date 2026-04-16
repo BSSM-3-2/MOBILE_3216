@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { Post } from '@type/Post';
-import { getFeed } from '@/api/content';
-// toggleLike 구현에 필요한 API 함수 import
-import { likePost, unlikePost } from '@/api/content';
+import { getFeed, likePost, unlikePost } from '@/api/content';
 
 interface FeedState {
     posts: Post[];
@@ -15,9 +13,10 @@ interface FeedState {
     loadMore: () => Promise<void>;
     toggleLike: (postId: string) => Promise<void>;
     removePost: (postId: string) => void;
+    prependPost: (post: Post) => void;
 }
 
-export const useFeedStore = create<FeedState>((set: any, get: any) => ({
+export const useFeedStore = create<FeedState>((set, get) => ({
     posts: [],
     page: 1,
     hasNext: false,
@@ -34,8 +33,8 @@ export const useFeedStore = create<FeedState>((set: any, get: any) => ({
                 hasNext: pagination.hasNext,
                 loading: false,
             });
-        } catch (e: any) {
-            set({ error: e?.message ?? '피드 로드 실패', loading: false });
+        } catch (e) {
+            set({ error: '피드를 불러오지 못했습니다.', loading: false });
         }
     },
 
@@ -53,62 +52,66 @@ export const useFeedStore = create<FeedState>((set: any, get: any) => ({
                 hasNext: pagination.hasNext,
                 loading: false,
             });
-        } catch {
+        } catch (e) {
             set({ loading: false });
         }
     },
 
     // 낙관적 업데이트: UI를 먼저 바꾸고 API 호출 → 실패 시 원상복구
     toggleLike: async (postId: string) => {
-        // snapshot for rollback
-        const prevPosts = get().posts;
-        // optimistic update: toggle liked and update likes count
-        set((state: FeedState) => ({
-            posts: state.posts.map(p =>
+        const { posts } = get();
+        const target = posts.find(p => p.id === postId);
+        if (!target) return;
+
+        const wasLiked = target.liked;
+
+        // 1) 즉시 UI 반영
+        set({
+            posts: posts.map(p =>
                 p.id === postId
                     ? {
                           ...p,
-                          liked: !p.liked,
-                          likes: p.liked ? p.likes - 1 : p.likes + 1,
+                          liked: !wasLiked,
+                          likes: wasLiked ? p.likes - 1 : p.likes + 1,
                       }
                     : p,
             ),
-        }));
+        });
 
         try {
-            // call API depending on new liked state
-            const updated = get().posts.find((p: Post) => p.id === postId);
-            if (!updated) return;
-
-            if (updated.liked) {
-                const res = await likePost(postId);
-                // sync server response if needed
-                set((state: FeedState) => ({
-                    posts: state.posts.map(p =>
-                        p.id === postId
-                            ? { ...p, likes: res.likes, liked: res.liked }
-                            : p,
-                    ),
-                }));
-            } else {
-                const res = await unlikePost(postId);
-                set((state: FeedState) => ({
-                    posts: state.posts.map(p =>
-                        p.id === postId
-                            ? { ...p, likes: res.likes, liked: res.liked }
-                            : p,
-                    ),
-                }));
-            }
-        } catch (e) {
-            // rollback using latest store state source get().posts to avoid stale closure
-            set({ posts: prevPosts });
+            // 2) API 호출
+            const result = wasLiked
+                ? await unlikePost(postId)
+                : await likePost(postId);
+            // 3) 서버 응답으로 최종 동기화
+            set({
+                posts: get().posts.map(p =>
+                    p.id === postId
+                        ? { ...p, likes: result.likes, liked: result.liked }
+                        : p,
+                ),
+            });
+        } catch {
+            // 4) 실패 시 롤백
+            set({
+                posts: get().posts.map(p =>
+                    p.id === postId
+                        ? {
+                              ...p,
+                              liked: wasLiked,
+                              likes: wasLiked ? p.likes + 1 : p.likes - 1,
+                          }
+                        : p,
+                ),
+            });
         }
     },
 
     removePost: (postId: string) => {
-        set((state: FeedState) => ({
-            posts: state.posts.filter(p => p.id !== postId),
-        }));
+        set({ posts: get().posts.filter(p => p.id !== postId) });
+    },
+
+    prependPost: (post: Post) => {
+        set({ posts: [post, ...get().posts] });
     },
 }));

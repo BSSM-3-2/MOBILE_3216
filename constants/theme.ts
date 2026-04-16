@@ -6,10 +6,10 @@
 import { Platform } from 'react-native';
 
 export const Pretendard = {
-    regular: 'Pretendard-Regular',
-    medium: 'Pretendard-Medium',
-    semiBold: 'Pretendard-SemiBold',
-    bold: 'Pretendard-Bold',
+    regular:   'Pretendard-Regular',
+    medium:    'Pretendard-Medium',
+    semiBold:  'Pretendard-SemiBold',
+    bold:      'Pretendard-Bold',
     extraBold: 'Pretendard-ExtraBold',
 } as const;
 

@@ -15,7 +15,7 @@ interface UserState {
     fetchUserPosts: (id: string) => Promise<void>;
 }
 
-export const useUserStore = create<UserState>((set: any, get: any) => ({
+export const useUserStore = create<UserState>((set, get) => ({
     me: null,
     profileMap: {},
     postMap: {},
@@ -26,7 +26,7 @@ export const useUserStore = create<UserState>((set: any, get: any) => ({
         set({ loading: true, error: null });
         try {
             const user = await getMe();
-            set((state: UserState) => ({
+            set(state => ({
                 me: user,
                 profileMap: { ...state.profileMap, [user.id]: user },
                 loading: false,
@@ -43,7 +43,7 @@ export const useUserStore = create<UserState>((set: any, get: any) => ({
         set({ loading: true, error: null });
         try {
             const user = await getUserById(id);
-            set((state: UserState) => ({
+            set(state => ({
                 profileMap: { ...state.profileMap, [id]: user },
                 loading: false,
             }));
@@ -56,7 +56,7 @@ export const useUserStore = create<UserState>((set: any, get: any) => ({
         set({ loading: true, error: null });
         try {
             const { data } = await getUserPosts(id);
-            set((state: UserState) => ({
+            set(state => ({
                 postMap: { ...state.postMap, [id]: data },
                 loading: false,
             }));

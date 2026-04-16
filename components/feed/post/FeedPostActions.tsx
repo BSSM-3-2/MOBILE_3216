@@ -1,10 +1,16 @@
-import { FeedColors, Spacing } from '@/constants/theme';
-import { useFeedStore } from '@/store/feed-store';
-import { ThemedText } from '@components/themed-text';
-import { ThemedView } from '@components/themed-view';
+import { TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
-import { Animated, StyleSheet, TouchableOpacity } from 'react-native';
+import { useState } from 'react';
+import { ThemedText } from '@components/themed-text';
+import { FeedColors, Spacing } from '@/constants/theme';
+import { ThemedView } from '@components/themed-view';
+import { useFeedStore } from '@/store/feed-store';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSequence,
+    withSpring,
+} from 'react-native-reanimated';
 
 function FeedPostActions({
     postId,
@@ -19,30 +25,33 @@ function FeedPostActions({
 }) {
     const [saved, setSaved] = useState(false);
     const { posts, toggleLike } = useFeedStore();
-    const likeScale = useRef(new Animated.Value(1)).current;
 
+    // 스토어의 최신 상태를 우선 사용, 없으면 props 초기값 fallback
     const post = posts.find(p => p.id === postId);
     const liked = post?.liked ?? initialLiked;
     const likeCount = post?.likes ?? initialLikes;
 
-    const handleSave = () => setSaved(prev => !prev);
+    // --- Reanimated: 하트 애니메이션 ---
+    // useSharedValue: JS 스레드와 UI 스레드가 공유하는 값
+    const heartScale = useSharedValue(1);
+
+    // useAnimatedStyle: UI 스레드에서 직접 실행되는 스타일 (worklet)
+    const heartAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: heartScale.value }],
+    }));
+
     const handleLike = () => {
+        // withSequence: 애니메이션을 순서대로 실행
+        // withSpring: 스프링 물리 기반 애니메이션 (JS 브리지 없이 UI 스레드에서 실행)
+        heartScale.value = withSequence(
+            withSpring(1.4, { damping: 3, stiffness: 300 }),
+            withSpring(1, { damping: 5, stiffness: 200 }),
+        );
         toggleLike(postId);
-        likeScale.setValue(1);
-        Animated.sequence([
-            Animated.timing(likeScale, {
-                toValue: 1.25,
-                duration: 120,
-                useNativeDriver: true,
-            }),
-            Animated.spring(likeScale, {
-                toValue: 1,
-                friction: 5,
-                tension: 150,
-                useNativeDriver: true,
-            }),
-        ]).start();
     };
+    // ------------------------------------
+
+    const handleSave = () => setSaved(prev => !prev);
 
     return (
         <ThemedView style={styles.actions}>
@@ -51,9 +60,8 @@ function FeedPostActions({
                     onPress={handleLike}
                     style={[styles.actionButton, styles.row]}
                 >
-                    <Animated.View
-                        style={{ transform: [{ scale: likeScale }] }}
-                    >
+                    {/* Animated.View: useAnimatedStyle 적용을 위한 Reanimated 뷰 */}
+                    <Animated.View style={heartAnimatedStyle}>
                         <Ionicons
                             name={liked ? 'heart' : 'heart-outline'}
                             size={26}

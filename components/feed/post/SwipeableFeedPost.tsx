@@ -1,92 +1,99 @@
-import { ReactNode } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import * as Haptics from 'expo-haptics';
 import Animated, {
-    clamp,
-    runOnJS,
-    useAnimatedStyle,
     useSharedValue,
+    useAnimatedStyle,
     withTiming,
     withSpring,
+    runOnJS,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { Post } from '@type/Post';
+import { FeedPost } from './FeedPost';
 
-const ACTION_WIDTH = 92;
-const OPEN_THRESHOLD = 56;
-const SPRING_CONFIG = {
-    damping: 18,
-    stiffness: 220,
-};
+const DELETE_AREA_WIDTH = 80;
+const DELETE_THRESHOLD = -60;
 
 function SwipeableFeedPost({
-    children,
+    post,
     onDelete,
 }: {
-    children: ReactNode;
-    onDelete: () => void;
+    post: Post;
+    onDelete: (id: string) => void;
 }) {
+    // 수평 이동 (스와이프 삭제)
     const translateX = useSharedValue(0);
-    const startX = useSharedValue(0);
-    const scale = useSharedValue(1);
+    // 카드 크기 (롱프레스 피드백)
+    const cardScale = useSharedValue(1);
 
-    const triggerLongPressHaptic = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    };
-
+    // --- Gesture.Pan: 스와이프 삭제 ---
     const panGesture = Gesture.Pan()
-        .maxPointers(1)
         .activeOffsetX([-10, 10])
-        .onBegin(() => {
-            startX.value = translateX.value;
+        .onUpdate(e => {
+            translateX.value = Math.min(
+                0,
+                Math.max(e.translationX, -DELETE_AREA_WIDTH),
+            );
         })
-        .onUpdate(event => {
-            const nextX = startX.value + event.translationX;
-            translateX.value = clamp(nextX, -ACTION_WIDTH, 0);
+        .onEnd(e => {
+            if (e.translationX < DELETE_THRESHOLD) {
+                translateX.value = withTiming(-DELETE_AREA_WIDTH);
+            } else {
+                translateX.value = withTiming(0);
+            }
+        });
+
+    // --- Gesture.LongPress: 롱프레스 피드백 ---
+    const longPressGesture = Gesture.LongPress()
+        .minDuration(400)
+        .onStart(() => {
+            // SharedValue 수정 — UI 스레드 직접 실행
+            cardScale.value = withSpring(0.96, { damping: 8 });
+            // Haptics는 네이티브 JS 함수 → runOnJS 필요
+            runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
         })
         .onEnd(() => {
-            const shouldOpen = translateX.value <= -OPEN_THRESHOLD;
-            translateX.value = withSpring(
-                shouldOpen ? -ACTION_WIDTH : 0,
-                SPRING_CONFIG,
-            );
-        });
-
-    const longPressGesture = Gesture.LongPress()
-        .minDuration(350)
-        .onStart(() => {
-            scale.value = withTiming(0.97, { duration: 120 });
-            runOnJS(triggerLongPressHaptic)();
+            cardScale.value = withSpring(1, { damping: 8 });
         })
         .onFinalize(() => {
-            scale.value = withTiming(1, { duration: 120 });
+            // 제스처가 어떻게 끝나든 scale 복구 (취소/완료 모두)
+            cardScale.value = withSpring(1, { damping: 8 });
         });
 
-    const cardAnimatedStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: translateX.value }, { scale: scale.value }],
+    // Gesture.Race: 먼저 활성화되는 제스처가 나머지를 취소
+    // - 빠른 스와이프 → Pan 활성화 → LongPress 취소
+    // - 400ms 정지  → LongPress 활성화 → Pan 취소
+    const composedGesture = Gesture.Race(longPressGesture, panGesture);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [
+            { translateX: translateX.value },
+            { scale: cardScale.value },
+        ],
     }));
 
-    const handleDelete = () => {
-        onDelete();
-        translateX.value = withSpring(0, SPRING_CONFIG);
+    const handleDeletePress = () => {
+        translateX.value = withTiming(0);
+        runOnJS(onDelete)(post.id);
     };
 
     return (
         <View style={styles.container}>
-            <View style={styles.deleteAction}>
+            <View style={styles.deleteArea}>
                 <TouchableOpacity
-                    onPress={handleDelete}
+                    onPress={handleDeletePress}
                     style={styles.deleteButton}
-                    activeOpacity={0.8}
                 >
-                    <Ionicons name='trash' size={22} color='#ffffff' />
+                    <Ionicons name='trash-outline' size={24} color='white' />
                 </TouchableOpacity>
             </View>
-            <GestureDetector
-                gesture={Gesture.Simultaneous(panGesture, longPressGesture)}
-            >
-                <Animated.View style={cardAnimatedStyle}>
-                    {children}
+
+            <GestureDetector gesture={composedGesture}>
+                <Animated.View
+                    style={[animatedStyle, { backgroundColor: '#FFF' }]}
+                >
+                    <FeedPost post={post} />
                 </Animated.View>
             </GestureDetector>
         </View>
@@ -96,24 +103,22 @@ function SwipeableFeedPost({
 const styles = StyleSheet.create({
     container: {
         overflow: 'hidden',
-        position: 'relative',
-        marginBottom: 20,
     },
-    deleteAction: {
+    deleteArea: {
         position: 'absolute',
         right: 0,
         top: 0,
         bottom: 0,
-        width: ACTION_WIDTH,
-        backgroundColor: '#ff3b30',
+        width: DELETE_AREA_WIDTH,
+        backgroundColor: '#ED4956',
         justifyContent: 'center',
         alignItems: 'center',
     },
     deleteButton: {
-        width: '100%',
-        height: '100%',
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        width: '100%',
     },
 });
 

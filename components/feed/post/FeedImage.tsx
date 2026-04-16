@@ -1,21 +1,20 @@
 import { Image, ImageLoadEventData } from 'expo-image';
-import {
-    Dimensions,
-    ImageSourcePropType,
-    StyleSheet,
-    View,
-} from 'react-native';
+import { Dimensions, ImageSourcePropType, StyleSheet } from 'react-native';
 import { useState } from 'react';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-    clamp,
-    runOnJS,
-    useAnimatedStyle,
     useSharedValue,
+    useAnimatedStyle,
+    withSpring,
+    withSequence,
     withTiming,
+    withDelay,
+    runOnJS,
 } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const MAX_SCALE = 3;
 
 export default function FeedImage({
     image,
@@ -25,109 +24,103 @@ export default function FeedImage({
     onDoubleTap?: () => void;
 }) {
     const [imageHeight, setImageHeight] = useState(SCREEN_WIDTH);
+
+    // --- 핀치줌 SharedValues ---
     const scale = useSharedValue(1);
     const savedScale = useSharedValue(1);
-    const imageHeightValue = useSharedValue(SCREEN_WIDTH);
-    const translateX = useSharedValue(0);
-    const translateY = useSharedValue(0);
-    const savedTranslateX = useSharedValue(0);
-    const savedTranslateY = useSharedValue(0);
 
-    // 이미지 비율 참조하여 이미지 크기 계산
-    const handleImageLoad = (e: ImageLoadEventData) => {
-        const { width, height } = e.source;
-        const ratio = height / width;
-        const nextHeight = SCREEN_WIDTH * ratio;
-        setImageHeight(nextHeight);
-        imageHeightValue.value = nextHeight;
-    };
+    // --- 더블탭 하트 오버레이 SharedValues ---
+    const heartOpacity = useSharedValue(0);
+    const heartScale = useSharedValue(0.5);
 
+    // Gesture.Pinch: 두 손가락 핀치 → 이미지 확대/축소
     const pinchGesture = Gesture.Pinch()
-        .onUpdate(event => {
-            const nextScale = savedScale.value * event.scale;
-            scale.value = Math.min(4, Math.max(1, nextScale));
+        .onUpdate(e => {
+            scale.value = Math.max(
+                1,
+                Math.min(savedScale.value * e.scale, MAX_SCALE),
+            );
         })
         .onEnd(() => {
-            const targetScale = scale.value < 1.03 ? 1 : scale.value;
-            scale.value = withTiming(targetScale, { duration: 140 });
-            savedScale.value = targetScale;
-            if (targetScale === 1) {
-                translateX.value = withTiming(0, { duration: 140 });
-                translateY.value = withTiming(0, { duration: 140 });
-                savedTranslateX.value = 0;
-                savedTranslateY.value = 0;
+            savedScale.value = scale.value;
+            if (scale.value <= 1) {
+                scale.value = withSpring(1);
+                savedScale.value = 1;
             }
         });
 
-    const panGesture = Gesture.Pan()
-        .maxPointers(1)
-        .onUpdate(event => {
-            if (scale.value <= 1.01) {
-                return;
-            }
-            const maxX = (SCREEN_WIDTH * scale.value - SCREEN_WIDTH) / 2;
-            const maxY =
-                (imageHeightValue.value * scale.value -
-                    imageHeightValue.value) /
-                2;
-            const nextX = savedTranslateX.value + event.translationX;
-            const nextY = savedTranslateY.value + event.translationY;
-            translateX.value = clamp(nextX, -maxX, maxX);
-            translateY.value = clamp(nextY, -maxY, maxY);
-        })
-        .onEnd(() => {
-            savedTranslateX.value = translateX.value;
-            savedTranslateY.value = translateY.value;
-        });
-
+    // Gesture.Tap (numberOfTaps=2): 더블탭 → 하트 애니메이션 + 좋아요
     const doubleTapGesture = Gesture.Tap()
         .numberOfTaps(2)
-        .maxDelay(250)
-        .onEnd((_, success) => {
-            if (success && onDoubleTap) {
-                runOnJS(onDoubleTap)();
-            }
+        .onEnd(() => {
+            // SharedValue 수정은 UI 스레드에서 직접 실행 — runOnJS 불필요
+            heartOpacity.value = withSequence(
+                withTiming(1, { duration: 100 }),
+                withDelay(500, withTiming(0, { duration: 300 })),
+            );
+            heartScale.value = withSequence(
+                withSpring(1.3, { damping: 4 }),
+                withDelay(400, withSpring(0.8, { damping: 6 })),
+            );
+            // JS 함수(toggleLike)는 runOnJS로 JS 스레드에서 호출
+            if (onDoubleTap) runOnJS(onDoubleTap)();
         });
 
+    // Gesture.Simultaneous: 핀치와 더블탭을 동시에 인식
+    // (핀치 중 탭, 탭 중 핀치 모두 처리)
     const composedGesture = Gesture.Simultaneous(
         pinchGesture,
-        panGesture,
         doubleTapGesture,
     );
 
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [
-            { translateX: translateX.value },
-            { translateY: translateY.value },
-            { scale: scale.value },
-        ],
+    const imageAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
     }));
+
+    const heartAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: heartOpacity.value,
+        transform: [{ scale: heartScale.value }],
+    }));
+
+    const handleImageLoad = (e: ImageLoadEventData) => {
+        const { width, height } = e.source;
+        const ratio = height / width;
+        setImageHeight(SCREEN_WIDTH * ratio);
+    };
 
     return (
         <GestureDetector gesture={composedGesture}>
-            <View
+            <Animated.View
                 style={[
-                    styles.frame,
+                    imageAnimatedStyle,
                     { width: SCREEN_WIDTH, height: imageHeight },
                 ]}
             >
+                <Image
+                    source={image}
+                    style={{ width: SCREEN_WIDTH, height: imageHeight }}
+                    onLoad={handleImageLoad}
+                />
+                {/* 더블탭 시 나타나는 하트 오버레이 */}
                 <Animated.View
-                    style={[StyleSheet.absoluteFillObject, animatedStyle]}
+                    style={[styles.heartOverlay, heartAnimatedStyle]}
+                    pointerEvents='none'
                 >
-                    <Image
-                        source={image}
-                        style={{ width: '100%', height: '100%' }}
-                        onLoad={handleImageLoad}
-                    />
+                    <Ionicons name='heart' size={80} color='white' />
                 </Animated.View>
-            </View>
+            </Animated.View>
         </GestureDetector>
     );
 }
 
 const styles = StyleSheet.create({
-    frame: {
-        overflow: 'hidden',
-        backgroundColor: '#000000',
+    heartOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
