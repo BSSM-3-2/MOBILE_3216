@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+import { registerPushDevice } from '@/api/push';
 import { useAuthStore } from '@/store/auth-store';
+
+const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
 
 /**
  * 로그인된 상태에서 Expo push token을 얻어 서버에 등록합니다.
@@ -12,41 +15,44 @@ export function usePushRegistration() {
     const accessToken = useAuthStore(s => s.accessToken);
 
     useEffect(() => {
+        if (IS_EXPO_GO) return;
         if (!accessToken) return;
         registerDevice();
     }, [accessToken]);
 }
 
 async function registerDevice() {
+    const Notifications = await import('expo-notifications');
+
     // 실기기가 아니면 Expo push token을 발급받을 수 없음
     if (!Device.isDevice) return;
 
-    // TODO 실습 8-1
-    // setNotificationChannelAsync로 Android 알림 채널을 생성하세요
-    // name, importance 등을 지정하고, importance 값을 바꿔가며 heads-up 동작을 비교해보세요
+    // Android 채널 설정
+    if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+            name: 'default',
+            importance: Notifications.AndroidImportance.MAX,
+        });
+    }
 
-    // TODO 실습 4-1
-    // getPermissionsAsync로 현재 권한 상태를 확인하고
-    // 미허용 시 requestPermissionsAsync로 사용자에게 요청하세요
-    // 최종적으로 granted가 아니면 return 처리하세요
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus } =
+        await Notifications.getPermissionsAsync();
+
     let finalStatus = existingStatus;
-
     if (existingStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
     }
 
     if (finalStatus !== 'granted') {
+        console.warn('[Push] 알림 권한이 거부되었습니다.');
         return;
     }
 
-    // TODO 실습 4-2
-    // getExpoPushTokenAsync로 Expo Push Token을 발급받고
-    // registerPushDevice(token)으로 서버에 전송하세요
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    const pushToken = await Notifications.getExpoPushTokenAsync(
-        projectId ? { projectId } : undefined,
-    );
-    console.log('Expo Push Token:', pushToken.data);
+    try {
+        const { data: token } = await Notifications.getExpoPushTokenAsync();
+        await registerPushDevice(token);
+    } catch (err) {
+        console.warn('[Push] 디바이스 등록 실패:', err);
+    }
 }
