@@ -14,9 +14,33 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@components/themed-text';
+import ErrorBoundary from '@components/ErrorBoundary';
 import { StyleSheet } from 'react-native';
 import { useAuthStore } from '@/store/auth-store';
 import { usePushRegistration } from '@/hooks/use-push-registration';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+    dsn: 'https://2721bec61506c27290ae5b4a4f5185b5@o4511345978572800.ingest.us.sentry.io/4511346000003072',
+
+    // Adds more context data to events (IP address, cookies, user, etc.)
+    // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+    sendDefaultPii: true,
+
+    // Enable Logs
+    enableLogs: true,
+
+    // Configure Session Replay
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1,
+    integrations: [
+        Sentry.mobileReplayIntegration(),
+        Sentry.feedbackIntegration(),
+    ],
+
+    // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+    // spotlight: __DEV__,
+});
 
 const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
 
@@ -53,7 +77,7 @@ function AuthGuard() {
     return null;
 }
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
     const { bootstrap /* TODO 실습 3: bootstrap을 꺼내세요 */ } =
         useAuthStore();
     const colorScheme = useColorScheme();
@@ -98,61 +122,67 @@ export default function RootLayout() {
             <ThemeProvider
                 value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
             >
-                <AuthGuard />
-                <Stack>
-                    <Stack.Screen
-                        name='(tabs)'
-                        options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                        name='create'
-                        options={{
-                            headerShown: false,
-                            animation: 'slide_from_right',
-                        }}
-                    />
-                    <Stack.Screen
-                        name='signup'
-                        options={{
-                            headerShown: true,
-                            headerTitle: () => (
-                                <ThemedText style={styles.default}>
-                                    회원가입
-                                </ThemedText>
-                            ),
-                            headerBackTitle: '뒤로',
-                        }}
-                    />
-                    <Stack.Screen
-                        name='login'
-                        options={{
-                            headerShown: true,
-                            headerTitle: () => (
-                                <ThemedText style={styles.default}>
-                                    로그인
-                                </ThemedText>
-                            ),
-                            headerBackTitle: '뒤로',
-                        }}
-                    />
-                    <Stack.Screen
-                        name='profile/[id]'
-                        options={{
-                            headerShown: true,
-                            headerTitle: () => (
-                                <ThemedText style={styles.default}>
-                                    사용자 프로필
-                                </ThemedText>
-                            ),
-                            headerBackTitle: '홈으로',
-                        }}
-                    />
-                </Stack>
+                <ErrorBoundary
+                    onError={err => {
+                        console.error('[GlobalBoundary]', err.message);
+                    }}
+                >
+                    <AuthGuard />
+                    <Stack>
+                        <Stack.Screen
+                            name='(tabs)'
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name='create'
+                            options={{
+                                headerShown: false,
+                                animation: 'slide_from_right',
+                            }}
+                        />
+                        <Stack.Screen
+                            name='signup'
+                            options={{
+                                headerShown: true,
+                                headerTitle: () => (
+                                    <ThemedText style={styles.default}>
+                                        회원가입
+                                    </ThemedText>
+                                ),
+                                headerBackTitle: '뒤로',
+                            }}
+                        />
+                        <Stack.Screen
+                            name='login'
+                            options={{
+                                headerShown: true,
+                                headerTitle: () => (
+                                    <ThemedText style={styles.default}>
+                                        로그인
+                                    </ThemedText>
+                                ),
+                                headerBackTitle: '뒤로',
+                            }}
+                        />
+                        <Stack.Screen
+                            name='profile/[id]'
+                            options={{
+                                headerShown: true,
+                                headerTitle: () => (
+                                    <ThemedText style={styles.default}>
+                                        사용자 프로필
+                                    </ThemedText>
+                                ),
+                                headerBackTitle: '홈으로',
+                            }}
+                        />
+                    </Stack>
+                </ErrorBoundary>
                 <StatusBar style='auto' />
             </ThemeProvider>
         </GestureHandlerRootView>
     );
-}
+});
 
 const styles = StyleSheet.create({
     default: {

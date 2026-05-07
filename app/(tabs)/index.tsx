@@ -1,5 +1,11 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, TouchableOpacity } from 'react-native';
+import {
+    ActivityIndicator,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import NavigationTop from '@components/navigation/NavigationTop';
 import ContentContainer from '@components/container';
 import { FeedList } from '@components/feed/FeedList';
@@ -14,8 +20,25 @@ import Animated, {
     Extrapolation,
 } from 'react-native-reanimated';
 
+function FeedError({
+    message,
+    onRetry,
+}: {
+    message: string;
+    onRetry: () => void;
+}) {
+    return (
+        <View style={styles.errorContainer}>
+            <Text style={styles.errorMessage}>{message}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+                <Text style={styles.retryText}>재시도</Text>
+            </TouchableOpacity>
+        </View>
+    );
+}
+
 export default function HomeScreen() {
-    const { posts, loading, fetchFeed, loadMore } = useFeedStore();
+    const { posts, loading, error, fetchFeed, loadMore } = useFeedStore();
     const router = useRouter();
 
     // scrollY: 스크롤 위치를 UI 스레드에서 직접 추적하는 SharedValue
@@ -70,7 +93,9 @@ export default function HomeScreen() {
                 </ContentContainer>
             </Animated.View>
 
-            {loading && posts.length === 0 ? (
+            {error && posts.length === 0 ? (
+                <FeedError message={error} onRetry={fetchFeed} />
+            ) : loading && posts.length === 0 ? (
                 <ActivityIndicator style={{ flex: 1 }} />
             ) : (
                 // scrollY를 FeedList에 전달 → useAnimatedScrollHandler가 내부에서 처리
@@ -83,3 +108,28 @@ export default function HomeScreen() {
         </ThemedView>
     );
 }
+
+const styles = StyleSheet.create({
+    errorContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+        gap: 12,
+    },
+    errorMessage: {
+        fontSize: 15,
+        textAlign: 'center',
+    },
+    retryButton: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#d1d5db',
+    },
+    retryText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+});

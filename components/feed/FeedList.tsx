@@ -1,9 +1,10 @@
-import { FlatList, RefreshControl } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import Animated, {
     useAnimatedScrollHandler,
     SharedValue,
 } from 'react-native-reanimated';
 import { Post } from '@type/Post';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { SwipeableFeedPost } from './post/SwipeableFeedPost';
 import { useFeedStore } from '@/store/feed-store';
 
@@ -33,7 +34,16 @@ function FeedList({
             data={posts}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
-                <SwipeableFeedPost post={item} onDelete={removePost} />
+                <ErrorBoundary
+                    key={item.id}
+                    fallback={
+                        <View style={postStyles.error}>
+                            <Text>이 게시물을 표시할 수 없어요.</Text>
+                        </View>
+                    }
+                >
+                    <SwipeableFeedPost post={item} onDelete={removePost} />
+                </ErrorBoundary>
             )}
             showsVerticalScrollIndicator={false}
             onEndReached={onEndReached}
@@ -50,5 +60,14 @@ function FeedList({
         />
     );
 }
+
+const postStyles = StyleSheet.create({
+    error: {
+        paddingVertical: 20,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+});
 
 export { FeedList };

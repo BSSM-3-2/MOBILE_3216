@@ -7,6 +7,7 @@ import expoConfig from 'eslint-config-expo/flat.js';
 export default defineConfig([
     expoConfig,
     {
+        files: ['**/*.{ts,tsx}'],
         languageOptions: {
             ecmaVersion: 2021,
             globals: {
